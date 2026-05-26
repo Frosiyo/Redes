@@ -1,0 +1,249 @@
+[DATACENTER ROUTER 2]
+conf t
+
+interface [COMMERCIAL]
+ ip address 192.168.93.177 255.255.255.248
+ no shutdown
+ exit
+
+interface [ENGINEERING]
+ ip address 192.168.93.185 255.255.255.252
+ no shutdown
+ exit
+
+interface [DATACENTER ROUTER 1]
+ ip address 192.168.93.194 255.255.255.252
+ no shutdown
+ exit
+
+[Configuração OSPF]
+ router ospf 1
+ network 192.168.93.176 0.0.0.7 area 0
+ network 192.168.93.184 0.0.0.3 area 0
+ network 192.168.93.192 0.0.0.3 area 0
+ exit
+
+-----------
+
+[DATACENTER ROUTER 1]
+conf t
+
+interface [DATACENTER ROUTER 2]
+ip address 192.168.93.193 255.255.255.252
+no shutdown
+exit
+
+interface [BUILDING 1 ROUTER 1]
+ip address 192.168.93.189 255.255.255.252
+no shutdown
+exit
+
+[CONFIGURAÇÃO OSPF]
+router ospf 1
+network 192.168.93.192 0.0.0.3 area 0
+network 192.168.93.188 0.0.0.3 area 0
+exit
+
+-----------
+
+[BUILDING 1 ROUTER 2]
+conf t
+
+ip dhcp excluded-address 192.168.93.1
+ip dhcp excluded-address 192.168.93.129
+
+ip dhcp pool ENGINEERING
+network 192.168.93.0 255.255.255.128
+default-router 192.168.93.1
+dns-server 192.168.93.179
+
+ip dhcp pool COMMERCIAL
+network 192.168.93.128 255.255.255.224
+default-router 192.168.93.129
+dns-server 192.168.93.179
+exit
+
+interface [COMMERCIAL]
+ip address 192.168.93.129 255.255.255.224
+no shutdown
+exit
+
+interface [ENGINEERING]
+ip address 192.168.93.1 255.255.255.128
+no shutdown
+exit
+
+interface [BUILDING 1 ROUTER 1]
+ip address 192.168.93.198 255.255.255.252
+no shutdown
+exit
+
+[CONFIGURAÇÃO OSPF]
+router ospf 1
+network 192.168.93.0 0.0.0.127 area 0
+network 192.168.93.128 0.0.0.31 area 0
+network 192.168.93.196 0.0.0.3 area 0
+exit
+
+-----------
+
+[BUILDING 1 ROUTER 1]
+conf t
+
+interface [DATACENTER ROUTER 1]
+ ip address 192.168.93.190 255.255.255.252
+ no shutdown
+ exit
+
+interface [BUILDING 1 ROUTER 2]
+ ip address 192.168.93.197 255.255.255.252
+ no shutdown
+ exit
+
+interface [BUILDING 2 MANAGEMENT]
+ip address 192.168.93.201 255.255.255.252
+no shutdown
+exit
+
+interface [BUILDING 2 EXTERIOR]
+ip address 192.168.93.205 255.255.255.252
+no shutdown
+exit
+
+[CONFIGURAÇÃO OSPF]
+router ospf 1
+network 192.168.93.188 0.0.0.3 area 0
+network 192.168.93.196 0.0.0.3 area 0
+network 192.168.93.200 0.0.0.3 area 0
+network 192.168.93.204 0.0.0.3 area 0
+exit
+
+-----------
+
+[BUILDING 2 MANAGEMENT ROUTER]
+conf t
+
+ip dhcp excluded-address 192.168.93.161
+ip dhcp pool MANAGEMENT
+network 192.168.93.160 255.255.255.240
+default-router 192.168.93.161
+dns-server 192.168.93.179
+exit
+
+interface [BUILDING 1 ROUTER 1]
+ip address 192.168.93.202 255.255.255.252
+no shutdown
+exit
+
+interface [MANAGEMENT PCs]
+ip address 192.168.93.161 255.255.255.240
+no shutdown
+exit
+
+[CONFIGURAÇÃO OSPF]
+router ospf 1
+network 192.168.93.200 0.0.0.3 area 0
+network 192.168.93.160 0.0.0.15 area 0
+exit
+
+-----------
+
+[BUILDING 2 EXTERIOR_ACCESS ROUTER]
+conf t
+
+interface [BUILDING 1 ROUTER 1]
+ip address 192.168.93.206 255.255.255.252
+ip nat inside
+no shutdown
+exit
+
+interface [ISP]
+ip address 192.137.77.10 255.255.255.252
+ip nat outside
+no shutdown
+exit
+
+access-list 1 permit 192.168.93.0 0.0.0.255
+ip nat inside source list 1 interface [ISP] overload
+
+ip nat inside source static tcp 192.168.93.178 80 192.137.77.10 80
+
+ip route 0.0.0.0 0.0.0.0 192.137.77.9
+router ospf 1
+network 192.168.93.204 0.0.0.3 area 0
+default-information originate
+exit
+
+-----------
+
+[ISP]
+conf t
+
+interface [BUILDING 2 EXTERIOR_ACCESS ROUTER]
+ip address 192.137.77.9 255.255.255.252
+no shutdown
+exit
+
+interface [LISBOA ROUTER]
+ip address 192.137.77.29 255.255.255.252
+no shutdown
+exit
+
+ip route 70.93.22.0 255.255.255.0 192.137.77.30
+
+ip dns server
+ip domain-lookup
+ip host www.criosave.pt 192.137.77.10
+
+
+! 1. Configure the Cloud-facing interface to pull an IP from your host network
+interface [CLOUD]
+ ip address dhcp
+ ip nat outside
+ no shutdown
+ exit
+
+! 2. Mark your internal-facing interfaces as NAT inside
+interface [LISBOA-ROUTER]
+ ip nat inside
+ exit
+
+interface [B2-EXTERIOR-ROUTER]
+ ip nat inside
+ exit
+
+! 3. Create an Access Control List (ACL) to permit all internal traffic to be NAT'd
+access-list 10 permit any
+
+! 4. Configure NAT Overload (PAT) to translate everything to the f1/0 interface's IP
+ip nat inside source list 10 interface FastEthernet1/0 overload
+
+! 5. Add a public DNS server so your routers and PCs can resolve external domains
+ip name-server 8.8.8.8
+
+-----------
+
+[LISBOA ROUTER]
+conf t
+
+interface [ISP]
+ip address 192.137.77.30 255.255.255.252
+no shutdown
+exit
+
+interface [COMMERCIAL]
+ip address 70.93.22.1 255.255.255.128
+no shutdown
+exit
+
+interface [LOGISTICS]
+ip address 70.93.22.129 255.255.255.192
+no shutdown
+exit
+
+interface [MARKETING]
+ip address 70.93.22.193 255.255.255.240
+no shutdown
+exit
+
+ip route 0.0.0.0 0.0.0.0 192.137.77.29
